@@ -1,0 +1,31 @@
+{
+    "name": "Lunarcrush TestKey Harvester",
+    "description": "Harvester client",
+    "version": "0.1",
+    "icons": {
+        "48": "img/icon-48.png",
+        "128": "img/icon-128.png"
+    },
+    "permissions": [
+        "tabs",
+        "storage",
+        "scripting",
+        "notifications"
+    ],
+    "host_permissions": [
+        "https://lunarcrush.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "js": [ "content_script.js" ],
+            "matches": [ "https://lunarcrush.com/*" ]
+        }
+    ],
+    "action": {
+        "default_icon": "img/icon-128-off.png"
+    },
+    "manifest_version": 3
+}
