@@ -13,7 +13,7 @@
       ]
    },
    "include": [
-      "./src/background.ts"
+      "./src/*.ts",
    ],
    "exclude": [
       "./dist",

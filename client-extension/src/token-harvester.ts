@@ -2,16 +2,18 @@
 
 import { retryOperation } from "./utils";
 
-export type onTokenReadCallback = (success: boolean, token: string | null, error: any | null) => void;
+export type TokenReadResult = { success:boolean, isLogged:boolean, token: string | null, error: any | null }
+
+export type OnTokenReadCallback = (result:TokenReadResult) => void;
 
 export class TokenHarvester {
     private static readonly _lcApiPageUrl = "https://lunarcrush.com/developers/api/coins";
     private static readonly _lcPageLoadMaxRetries = 3;
     private static readonly _lcPageLoadTimeout = 5000; // ms
 
-    private readonly _onTokenGet: onTokenReadCallback;
+    private readonly _onTokenGet: OnTokenReadCallback;
 
-    constructor(onTokenGet: onTokenReadCallback) {
+    constructor(onTokenGet: OnTokenReadCallback) {
         this._onTokenGet = onTokenGet;
     }
 
@@ -26,13 +28,31 @@ export class TokenHarvester {
             .then(tab => openedTab = tab)
             .then(tab => this.ensureApiCoinsUrl(tab))
             .then(tab => this.harvestApiToken(tab))
-            .then(token => this._onTokenGet(true, token, null))
-            .catch(error => this._onTokenGet(false, null, error))
+            .then(result => this._onTokenGet(result))
+            .catch(error => this._onTokenGet(this.createFailedTokenRead(error)))
             .finally(() => {
                 if (openedTab != null) {
                     chrome.tabs.remove(openedTab.id ?? -1);
                 }
             })
+    }
+
+    private createSuccessTokenRead(token:string, isLogged:boolean):TokenReadResult{
+        return {
+            success: true,
+            token: token,
+            isLogged: isLogged,
+            error: null
+        }
+    }
+
+    private createFailedTokenRead(error:any):TokenReadResult{
+        return {
+            success: false,
+            token: null,
+            isLogged: false,
+            error: error
+        };
     }
 
     /**
@@ -106,7 +126,7 @@ export class TokenHarvester {
         return retryOperation<chrome.tabs.Tab>(tryToResolve, 100, TokenHarvester._lcPageLoadMaxRetries);
     }
 
-    private harvestApiToken(tab: chrome.tabs.Tab): Promise<string> {
+    private harvestApiToken(tab: chrome.tabs.Tab): Promise<TokenReadResult> {
         return new Promise((resolve, reject) => {
             console.log("[Harvest] Sending message to content_script (tabId:" + tab.id + ").");
 
@@ -118,7 +138,11 @@ export class TokenHarvester {
                         return;
                     }
 
-                    let parsedData = { token: null };
+                    // Example of parsed data:
+                    // Logged: '{"signedIn":true,"token":"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX","theme":"dark","locale":"en-US","currency":"USD","exchangeRate":1,"lowPowerMode":false,"level":1,"role":"user"}'
+                    // Anonym:       '{"seed":37,"token":"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"}'
+
+                    let parsedData = { token: '', signedIn: false };
                     try {
                         parsedData = JSON.parse(data);
                     }
@@ -128,8 +152,10 @@ export class TokenHarvester {
                     }
 
                     if (typeof parsedData.token == "string" && parsedData.token) {
+                        const isLogged = typeof parsedData.signedIn == "boolean" && parsedData.signedIn;
+
                         // token found
-                        resolve(parsedData.token);
+                        resolve(this.createSuccessTokenRead(parsedData.token, isLogged))
                     } else {
                         reject("[Harvest] No token found in '" + data + "'.");
                     }

@@ -1,4 +1,4 @@
-import { TokenHarvester } from "./token-harvester";
+import { TokenHarvester, TokenReadResult } from "./token-harvester";
 
 function showMessage(message: string, title: string) {
     const messageId = "AlertNotification";
@@ -15,14 +15,18 @@ function showMessage(message: string, title: string) {
     );
 }
 
-function onTokenReadCallback(success: boolean, token: string | null, error: string | null) {
-    if (success) {
-        showMessage(token + "", "Token found");
-        console.log("[BG TokenRead]: Token found: " + token);
+function onTokenReadCallback(result: TokenReadResult) {
+    if (result.success) {
+        if (result.isLogged) {
+            showMessage(result.token + "", "Token found");
+        } else {
+            showMessage(result.token + "", "Token found [WARNING: Not logged]");
+        }
+        console.log(`[BG TokenRead]: Token found: ${result.token} (logged: ${result.isLogged})`);
     } else {
-        showMessage(error + "", "ERROR");
-        console.error("[BG TokenReadError]: " + error + "; Details folow:");
-        console.error(error);
+        showMessage(result.error + "", "ERROR");
+        console.error(`[BG TokenReadError]: ${result.error}; Details folow:`);
+        console.error(result.error);
     }
 }
 
